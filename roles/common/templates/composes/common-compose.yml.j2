@@ -1,0 +1,265 @@
+version: "3.8"
+
+networks:
+  servicos:
+    external:
+      name: servicos
+  nginx:
+    external:
+      name: nginx
+
+volumes:
+  fileprovider_files:
+    name: fileprovider_files
+
+services:
+  viasoft-loader:
+    image: "korpcicd/viasoft.loader:2.0.x"
+    container_name: "Viasoft.Loader"
+    restart: always
+    environment:
+      - backendUrl=http://host.docker.internal:9999
+    ports:
+      - "9876:80"
+    networks:
+      servicos:
+        ipv4_address: 172.18.128.2
+
+  viasoft-core-hybridproxy:
+    image: "korp/viasoft.core.hybridproxy:1.0.x"
+    container_name: "Viasoft.Core.Hybridproxy"
+    restart: always
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - GATEWAY_HOST=host.docker.internal
+      - ROUTES_ENDPOINT=http://host.docker.internal:9998/api/routes
+    networks:
+      - servicos
+
+  viasoft-core-hybridservicebus:
+    image: "korp/viasoft.core.hybridservicebus:1.3.x"
+    container_name: "Viasoft.Core.Hybridservicebus"
+    restart: always
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-authentication:
+    image: "korp/viasoft.authentication:1.5.x"
+    container_name: "Viasoft.Authentication"
+    restart: always
+    depends_on:
+      - hybridproxy
+      - hybridservicebus
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - URL_LOADER=http://localhost:4200/*,http://host.docker.internal:4200/*,http://localhost:4201/*,http://host.docker.internal:4201/*,http://host.docker.internal:9876/*
+      - URL_REDIRECT=http://host.docker.internal:9876
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-tenantmanagement:
+    image: "korp/viasoft.tenantmanagement:1.2.x"
+    container_name: "Viasoft.Tenantmanagement"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-notification:
+    image: "korp/viasoft.notification:1.2.x"
+    container_name: "Viasoft.Notification"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-administration:
+    image: "korp/viasoft.administration:1.3.x"
+    container_name: "Viasoft.Administration"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500a
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-authorization:
+    image: "korp/viasoft.authorization:1.2.x"
+    container_name: "Viasoft.Authorization"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-portal:
+    image: "korp/viasoft.portal:1.5.x"
+    container_name: "Viasoft.Portal"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - URL_CDN=http://host.docker.internal:5001
+      - URL_LOADER=http://host.docker.internal:9876
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-licenseserver:
+    image: "korp/viasoft.licensing.licenseserver:1.3.x"
+    container_name: "Viasoft.Licenseserver"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-licensingmanagement:
+    image: "korp/viasoft.licensing.licensingmanagement:1.5.x"
+    container_name: "Viasoft.Licensingmanagement"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+      - tenantmanagement
+      - licenseserver
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-emailing:
+    image: "korp/viasoft.emailing:1.0.x"
+    container_name: "Viasoft.Emailing"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-emailtemplate:
+    image: "korp/viasoft.emailing.emailtemplate:1.2.x"
+    container_name: "Viasoft.Emailtemplate"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-workflow-orchestrator:
+    image: "korp/viasoft.workflow.orchestrator:1.3.x"
+    container_name: "Viasoft.Workflow.Orchestrator"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-userprofile:
+    image: "korp/viasoft.userprofile:1.3.x"
+    container_name: "Viasoft.Userprofile"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-dashboard:
+    image: "korp/viasoft.dashboard:1.3.x"
+    container_name: "Viasoft.Dashboard"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-reporting:
+    image: "korp/viasoft.reporting:1.3.x"
+    container_name: "Viasoft.Reporting"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos
+
+  viasoft-fileprovider:
+    image: "korp/viasoft.fileprovider:1.4.x"
+    container_name: "Viasoft.Fileprovider"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+      - FILE_LOCATION=/app/FileProviderResource
+    networks:
+      - servicos
+    volumes:
+      - fileprovider_files:/app/FileProviderResource
+
+  viasoft-geolocation:
+    image: "korp/viasoft.geolocation:1.0.x"
+    container_name: "Viasoft.Geolocation"
+    restart: always
+    depends_on:
+      - viasoft-authentication
+    environment:
+      - URL_CONSUL=http://host.docker.internal:8500
+      - URL_GATEWAY=http://host.docker.internal:9999
+      - ASPNETCORE_ENVIRONMENT=Development
+    networks:
+      - servicos

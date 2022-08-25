@@ -1,0 +1,21 @@
+{
+  "ServiceBus": {
+    "StorageConnectionString": "Server=db_mssql,1433; Database=Viasoft_Authentication; User Id={{ mssql.korp_user }}; Password={{ mssql.korp_password }} MultipleActiveResultSets=true; Encrypt=False"
+  },
+  "UrlLoader": "http://localhost:4200/*,http://{{ host_ip }}:4200/*,http://localhost:4201/*,http://{{ host_ip }}:4201/*,http://{{ host_ip }}:9876/*",
+  "UrlRedirect": "http://{{ host_ip }}:9876",
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=db_mssql,1433; Database=Viasoft_Authentication; User Id={{ mssql.korp_user }}; Password={{ mssql.korp_password }} Encrypt=False"
+  },
+  "Provisioning":{
+    "EnableSchemaProvisioning": "false"
+  },
+  "EnableEnvironmentDependentConnectionString": "false",
+  "ExternalAuthentication": {
+    "Google": {
+      "ClientId": "301495796183-7uuevrhm127p7e123eeemg9dnfj61hd4.apps.googleusercontent.com",
+      "ClientSecret": "H_kxi1Gy8PZpXDKV4yhXl0JD",
+      "AllowedScopes": "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/calendar.settings.readonly"
+    }
+ }
+}

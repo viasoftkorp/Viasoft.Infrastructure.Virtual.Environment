@@ -1,0 +1,41 @@
+DECLARE @dbs table(DatabaseName varchar(MAX))
+DECLARE @dbname varchar(MAX)
+DECLARE @insertuser VARCHAR(MAX)
+
+------------------- INSIRA AQUI OS BANCOS A SEREM CRIADOS -------------------
+insert into @dbs values('Viasoft_TenantManagement'),('Viasoft_Notification'),('Viasoft_Administration'),('Viasoft_Authentication'),('Viasoft_Authorization'),
+					   ('Viasoft_Portal'),('Viasoft_Core_HybridServiceBus'),('Viasoft_Licensing_LicensingManagement'),('Viasoft_Emailing_EmailTemplate'),
+					   ('Viasoft_Workflow_Orchestrator'),('Viasoft_UserProfile'),('Viasoft_FileProvider'),('Viasoft_Dashboard'),('Viasoft_Reporting'),
+					   ('Viasoft_GeoLocation')
+
+DECLARE cur CURSOR FAST_FORWARD FOR
+	SELECT DatabaseName FROM @dbs
+
+	OPEN cur
+	FETCH NEXT FROM cur INTO @dbname
+	WHILE @@FETCH_STATUS = 0
+		BEGIN
+		  
+		  ------ CRIA TODOS OS BANCOS QUE ESTÃO NA VARIÁVEL @dbs ------
+		  IF NOT EXISTS(SELECT * FROM [sys].[sysdatabases] WHERE name = @dbname)
+		  BEGIN
+	        PRINT 'Criado o DB: [' + @dbname + ']'
+            EXEC('CREATE DATABASE ' + @dbname)
+          END
+		 
+		 ------ INSERE O USUÁRIO {{ mssql.korp_user }} EM CADA DB COM PERMISSÃO DE DB OWNER ------
+		 SELECT @insertuser = ('USE [' + @dbname + '] IF NOT EXISTS(SELECT name FROM [sys].[database_principals] WHERE name = ''{{ mssql.korp_user }}'')
+          BEGIN
+			PRINT N''Adicionado usuário [ 	] ao DB: [' + @dbname + ']'' 
+			CREATE USER [{{ mssql.korp_user }}] FOR LOGIN [{{ mssql.korp_user }}]
+			ALTER USER [{{ mssql.korp_user }}] WITH DEFAULT_SCHEMA=[dbo]
+			ALTER ROLE [db_owner] ADD MEMBER [{{ mssql.korp_user }}]
+          END')
+		 EXEC(@insertuser)
+
+	  FETCH NEXT FROM cur INTO @dbname
+	 END
+   CLOSE cur
+DEALLOCATE cur
+
+SELECT 1

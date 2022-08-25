@@ -1,0 +1,179 @@
+version: "3.8"
+
+x-extra_hosts:
+  &default-extra_hosts
+  - "db_mssql: $DB_MSSQL"
+  - "app_server: $APP_SERVER"
+  - "korp-api: $API_GATEWAY"
+  - "korp: $PORTAL_GATEWAY"
+  - "korp-cdn: $CDN_GATEWAY"
+
+networks:
+  servicos:
+    external:
+      name: servicos
+
+volumes:
+  consul-server:
+    name: consul-server
+  rabbitmq-data:
+    name: rabbitmq-data
+  postgres-data:
+    name: postgres-data
+  portainer-data:
+    name: portainer-data
+
+services:
+  consul-server:
+    image: "consul:1.12"
+    container_name: "consul-server"
+    restart: always
+    command: "agent -server -bootstrap-expect=1"
+    ports:
+      - "8300:8300"
+      - "8301:8301/tcp"
+      - "8301:8301/udp"
+      - "8500:8500"
+      - "8600:8600/tcp"
+      - "8600:8600/udp"
+    volumes:
+      - "{{ korp_dir_path }}/configs/consul-server.json:/consul/config/server.json"
+      - consul-server:/consul/data/
+    networks:
+      - servicos
+    labels:
+      com.centurylinklabs.watchtower.enable: false
+
+  nginx:
+    image: "nginx:latest"
+    container_name: "nginx"
+    restart: always
+    extra_hosts: *default-extra_hosts
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "{{ korp_dir_path }}/configs/nginx/conf.d/:/etc/nginx/conf.d/"
+      - "{{ dados_docker_dir_path }}/nginx/cdn/:/etc/nginx/cdn/"
+    networks:
+      - servicos
+    labels:
+      com.centurylinklabs.watchtower.enable: false
+
+  fabio:
+    image: "fabiolb/fabio:latest"
+    container_name: "fabio"
+    restart: always
+    depends_on:
+      - consul-server
+    extra_hosts: *default-extra_hosts
+    environment:
+      - registry_consul_addr=http://consul-server:8500
+      - proxy_matcher=iprefix
+    ports:
+      - "9999:9999"
+      - "9998:9998"
+    networks:
+      servicos:
+        ipv4_address: 172.18.128.0
+    labels:
+      com.centurylinklabs.watchtower.enable: false
+
+  {{ postgres_container_name }}:
+    image: "postgres:14"
+    container_name: "{{ postgres_container_name }}"
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD={{ postgres.default_password }}
+    ports:
+      - "5432:5432"
+    volumes:
+      - "postgres-data:/var/lib/postgresql/data"
+    networks:
+      - servicos
+    labels:
+      com.centurylinklabs.watchtower.enable: false
+
+  {{ rabbitmq_container_name }}:
+    image: "korp/rabbitmq:1.1.0"
+    container_name: "{{ rabbitmq_container_name }}"
+    # não remover esse hostname porque o RABBITMQ utiliza o hostname da máquina para compor as pastas internas
+    # e cada vez que um container inicia, seu nome é alterado caso não esteja especificado
+    hostname: "rabbitmq" 
+    restart: always
+    depends_on:
+      - consul-server
+    environment:
+      - TCP_PORTS=15672,5672
+      - RABBITMQ_NODENAME=rabbitmq
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - "rabbitmq-data:/var/lib/rabbitmq"
+    networks:
+      - servicos
+
+  {{ redis_container_name }}:
+    image: "redis:7.0"
+    container_name: "{{ redis_container_name }}"
+    hostname: "redis"
+    restart: always
+    depends_on:
+      - consul-server
+    command: "redis-server /usr/local/etc/redis/redis.conf"
+    sysctls:
+      net.core.somaxconn: 1024
+    networks:
+      - servicos
+    ports:
+      - "6379:6379"
+    volumes:
+      - "{{ korp_dir_path }}/configs/redis.conf:/usr/local/etc/redis/redis.conf"
+    labels:
+      com.centurylinklabs.watchtower.enable: false
+
+  portainer:
+    image: "portainer/portainer-ce:2.9.1"
+    container_name: "portainer"
+    restart: always
+    command: --admin-password='$$2y$$12$$G0u7sVYXDoCWYfBaPqwFOu00X.uHOXhGTF.mcySC2M1pxyWcXUOHe'
+    networks:
+      - servicos
+    ports:
+      - "9011:9000"
+    volumes:
+      - "portainer-data:/data"
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      com.centurylinklabs.watchtower.enable: false
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: always
+    networks:
+      - servicos
+    environment:
+      WATCHTOWER_NOTIFICATIONS_HOSTNAME: "{{ tenant_id }}"
+      WATCHTOWER_NOTIFICATIONS_LEVEL: warn
+      WATCHTOWER_NOTIFICATIONS: "msteams"
+      WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "{{ services_secrets.Others.WatchTower.WebHooks.MsTeams }}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --include-stopped --revive-stopped --cleanup --schedule "$AUTO_UPDATE_CRON"
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:latest
+    container_name: mssql
+    restart: always
+    networks:
+      - servicos
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "gvj2IQCp6B"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
+    volumes:
+      - "{{ dados_docker_dir_path }}/mssql/:/var/opt/mssql/"

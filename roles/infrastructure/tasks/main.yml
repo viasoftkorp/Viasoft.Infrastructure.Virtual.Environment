@@ -1,0 +1,94 @@
+- name: instalação de dependências padrões
+  ansible.builtin.pip:
+    name: "{{ item }}"
+  loop:
+    # Bibliotecas usadas pelo Ansible para usar o Consul
+    - python-consul
+    - requests
+    # Bibliotecas usadas pelo Ansible para rodar querys no SQL Server
+    - pymssql
+
+- name: configuração de arquivos e pastas
+  ansible.builtin.import_tasks: files_and_folders_setup.yml
+
+
+- name: criação e inicialização de default-compose
+  community.docker.docker_compose:
+    project_src: "{{ compose_dir_path }}/"
+    env_file: "{{ docker_env_file_path }}"
+    files:
+      - infrastructure-compose.yml
+
+
+- name: criação de usuário de uso da korp no Postgres
+  community.postgresql.postgresql_user:
+    db: postgres
+    login_host: "{{ postgres.address }}"
+    name: "{{ postgres.korp_user }}"
+    password: "{{ postgres.korp_password }}"
+    login_user: "{{ postgres.default_user }}"
+    login_password: "{{ postgres.default_password }}"
+    role_attr_flags: LOGIN,SUPERUSER,CREATEDB,CREATEROLE,INHERIT,REPLICATION
+
+- name: criação de usuário de uso da korp no SQL Server
+  community.general.mssql_script:
+    login_user: "{{ mssql.default_user }}"
+    login_password: "{{ mssql.default_password }}"
+    login_host: "{{ mssql.address }}"
+    name: master
+    script: "{{ lookup('template', 'sql/create_user.j2') | string }}"
+
+
+- name: "garantia de kvs no consul"
+  ansible.builtin.include_role:
+    name: utils
+    tasks_from: 'consul_kv/ensure_kv'
+  vars: 
+    service_name: "{{ item }}"
+  loop:
+    - Global
+    - Viasoft.Workflow.Orchestrator
+    - Viasoft.Authentication
+    - Viasoft.Emailing
+    - Viasoft.Authorization
+    - Viasoft.TenantManagement
+    - Viasoft.Licensing.LicenseServer
+
+- name: "garantia de kvs padrões no consul"
+  ansible.builtin.include_role:
+    name: utils
+    tasks_from: 'consul_kv/ensure_default_kv'
+  vars: 
+    service_name: "{{ item }}"
+    database_name: "{{ item | replace('.','_') }}"
+  loop:
+    - Viasoft.Administration
+    - Viasoft.Notification
+    - Viasoft.Portal
+    - Viasoft.Core.HybridServiceBus
+    - Viasoft.Licensing.LicensingManagement
+    - Viasoft.UserProfile
+    - Viasoft.Emailing.EmailTemplate
+    - Viasoft.FileProvider
+    - Viasoft.Dashboard
+    - Viasoft.Reporting
+    - Viasoft.GeoLocation
+
+- name: "configuração base de SQL Server"
+  community.general.mssql_script:
+    login_user: "{{ mssql.korp_user }}"
+    login_password: "{{ mssql.korp_password }}"
+    login_host: "{{ mssql.address }}"
+    name: master
+    script: "{{ lookup('template', 'templates/queries/base_config.sql.j2') | string }}"
+
+
+- name: configuração de CDN
+  ansible.builtin.import_tasks: cdn_config.yml
+  vars:
+    app_id: "{{ item }}"
+  loop:
+    - portal
+    - ADM01
+    - LS01
+    - login

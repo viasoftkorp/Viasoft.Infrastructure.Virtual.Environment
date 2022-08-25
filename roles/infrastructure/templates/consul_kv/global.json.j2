@@ -1,0 +1,76 @@
+{
+  "Serilog": {
+    "Using": [
+      "Serilog.Expressions"
+    ],
+    "RequestLog": {
+      "OverrideDefault": true,
+      "MessageTemplate": "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms"
+    },
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {        
+        "Microsoft.AspNetCore": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning",
+        "Rebus": "Warning",
+        "Hangfire": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console"
+      }
+    ],
+    "Filter": [
+      {
+        "Name": "ByExcluding",
+        "Args": {
+          "expression": "RequestPath like '/health'"
+        }
+      }
+    ],
+    "Enrich": [
+      "FromLogContext"
+    ]
+  },
+  "LoggingLevel": "Warning",
+  "Logging": {
+    "Level": "Warning"
+  },
+  "ServiceDiscovery": {
+    "HostAddress": "{{ host_ip }}",
+    "HealthCheck" : {
+      "DeregisterCriticalServiceAfter": "60s",
+      "Timeout": "5s",
+      "Interval": "10s"
+    }
+  },
+  "GatewayUrl": "http://{{ host_ip }}:9999",
+  "IntervaloHealthCheckSegs": "10",
+  "RemoverServicoAposFalhaSegs": "10",
+  "LogsGrafanaPostgresConn": "User ID=postgres; Password=asf@fsdf23a!; Host=grafana.postgres; Port=5432; Database=logs;",
+  "CORS": "http://localhost:4200,http://{{ host_ip }}:4200,http://localhost:4201,http://{{ host_ip }}:4201,http://{{ host_ip }}:9876",
+  "Authentication":  {
+    "Authority": "http://{{ host_ip }}:9999/oauth",
+    "IntrospectionSecret": "6BD46851-A6AB-4A3E-97A9-EBEBFFC478B7"
+  },
+  "RuntimeEnvironment": "development",
+  "Authorization": {
+    "Secret": "FD45E667-1449-4F30-A506-0D30E23E209B"
+  },
+  "ServiceBus":{
+    "Transport": {
+      "Adapter": "rabbitmq",
+      "Hostname": "amqp://guest:guest@{{ host_ip }}"
+    },
+    "StorageConnectionString": "Server=db_mssql,1433; Database=Default_Database; User Id={{ mssql.korp_user }}; Password={{ mssql.korp_password }}; MultipleActiveResultSets=true; Encrypt=False"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=db_mssql,1433; Database=Default_Database; User Id={{ mssql.korp_user }}; Password={{ mssql.korp_password }}; Encrypt=False"
+  },
+  "Caching":
+  {
+    "Endpoints": "{{ host_ip }}:6379",
+    "Password": "3a26b22142b642e5a3769fbe1ea08324e5430ab1b918425b8b72770d9f3e8fc6"
+  }
+}

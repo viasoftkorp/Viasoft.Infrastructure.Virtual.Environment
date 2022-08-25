@@ -1,0 +1,26 @@
+---
+linux_korp:
+  user: korp
+
+host_ip: "host.docker.internal"
+
+postgres:
+  address: 127.0.0.1
+  default_user: postgres
+  default_password: postgres
+  korp_user: korp.services
+  korp_password: postgres
+mssql:
+  address: "host.docker.internal"
+  default_user: sa
+  default_password: gvj2IQCp6B
+  korp_user: korp.services
+  korp_password: gvj2IQCp6B
+
+korp_dir_path: "/etc/korp"
+dados_docker_dir_path: "{{ korp_dir_path }}/dados-docker"
+compose_dir_path: "{{ korp_dir_path }}/composes"
+
+redis_container_name: redis
+rabbitmq_container_name: rabbitmq
+postgres_container_name: postgres

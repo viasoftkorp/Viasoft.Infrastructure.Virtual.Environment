@@ -1,0 +1,21 @@
+- name: garantia da existência dos diretórios de volume infrastructure
+  ansible.builtin.include_role:
+    name: utils
+    tasks_from: services/ensure_volume_folder
+  vars:
+    volume_path: "{{ dados_docker_dir_path }}/nginx/cdn/{{ app_id }}/v1.0.0/"
+  loop:
+
+- name: extração de arquivos
+  ansible.builtin.unarchive:
+    src: "https://cdn-interno.s3-sa-east-1.amazonaws.com/{{ app_id }}.7z"
+    dest: "{{ dados_docker_dir_path }}/nginx/cdn/{{ app_id }}/v1.0.0/"
+    remote_src: true
+
+- name: substituição de variáveis
+  ansible.builtin.replace:
+    path: "{{ dados_docker_dir_path }}/nginx/cdn/{{ app_id }}/v1.0.0/assets/app-settings/appsettings.json"
+    regexp: '*URL_GATEWAY!*'
+    replace: 'http://{{ host_ip }}:9999'
+
+  asfsd: "URL_GATEWAY!"

@@ -1,0 +1,65 @@
+- name: "verificação de diretório {{ korp_dir_path }}"
+  ansible.builtin.stat:
+    path: "{{ korp_dir_path }}"
+  register: korp_dir_path
+
+- name: criação de diretório de scripts
+  ansible.builtin.file:
+    path: "{{ korp_dir_path }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ linux_korp.user }}"
+    group: root
+  when: not korp_dir_path.stat.exists
+
+- name: transferência de arquivos de configuração em files
+  ansible.builtin.copy:
+    dest: "{{ korp_dir_path }}/configs/"
+    src: configs/
+    owner: "{{ linux_korp.user }}"
+    group: root
+    mode: '0644'
+
+- name: configuração e transferência de arquivos de configuração em templates
+  ansible.builtin.template:
+    dest: "{{ korp_dir_path }}/configs/{{ item[:-3] | basename }}"
+    src: "configs/{{ item | basename }}"
+    owner: "{{ linux_korp.user }}"
+    group: root
+    mode: '0644'
+  loop:
+    "{{ lookup('fileglob', 'templates/configs/*', wantlist=True) | select('search','.j2') }}"
+
+- name: verificação de diretório de composes
+  ansible.builtin.stat:
+    path: "{{ compose_dir_path }}/"
+  register: korp_compose_folder
+
+- name: criação de diretório de composes
+  ansible.builtin.file:
+    path: "{{ compose_dir_path }}/"
+    state: directory
+    mode: '0755'
+    owner: "{{ linux_korp.user }}"
+    group: root
+  when: not korp_compose_folder.stat.exists
+
+- name: configuração e transferência de arquivos de compose
+  ansible.builtin.template:
+    dest: "{{ compose_dir_path }}/{{ item[:-3] | basename }}"
+    src: "composes/{{ item | basename }}"
+    owner: "{{ linux_korp.user }}"
+    group: root
+    mode: '0644'
+  loop:
+    "{{ lookup('fileglob', 'templates/composes/*', wantlist=True) | select('search','.yml.j2') }}"
+
+- name: garantia da existência dos diretórios de volume infrastructure
+  ansible.builtin.include_role:
+    name: utils
+    tasks_from: services/ensure_volume_folder
+  vars:
+    volume_path: "{{ item }}"
+  loop:
+    - "{{ dados_docker_dir_path }}/mssql"
+    - "{{ dados_docker_dir_path }}/nginx/cdn"
